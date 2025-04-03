@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from motor.motor_asyncio import AsyncIOMotorClient
 from contextlib import asynccontextmanager
+from app.models.game import Game, GameList
 
 app = FastAPI()
 
@@ -20,3 +21,14 @@ app = FastAPI(lifespan=lifespan)
 async def root():
     return {"greeting": "Hello world"}
 
+
+@app.get("/test-game")
+async def test_game():
+    game = Game(
+        id="123456",
+        name="Minecraft",
+    )
+
+    game_list = GameList(data=[game])
+    return game_list
+    
