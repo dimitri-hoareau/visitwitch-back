@@ -2,6 +2,7 @@ import os
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from contextlib import asynccontextmanager
 from app.models.game import Game, GameList
@@ -9,15 +10,9 @@ from app.models.video import  Video, VideoList
 
 load_dotenv()
 
-# Récupérer les identifiants Twitch depuis les variables d'environnement
-TWITCH_CLIENT_ID = os.getenv("TWITCH_CLIENT_ID")
-TWITCH_CLIENT_SECRET = os.getenv("TWITCH_CLIENT_SECRET")
-
-app = FastAPI()
 
 MONGODB_URL = os.getenv("MONGODB_URL")
 DB_NAME = os.getenv("DB_NAME")
-
 TWITCH_CLIENT_ID = os.getenv("TWITCH_CLIENT_ID")
 TWITCH_CLIENT_SECRET = os.getenv("TWITCH_CLIENT_SECRET")
 
@@ -29,6 +24,15 @@ async def lifespan(app: FastAPI):
     app.mongodb_client.close()
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 async def get_twitch_token():
     async with httpx.AsyncClient() as client:
@@ -45,25 +49,10 @@ async def get_twitch_token():
         return data["access_token"]
     
 
-@app.get("/")
-async def root():
-    return {"greeting": "Hello world"}
-
-
-@app.get("/test-game")
-async def test_game():
-    game = Game(
-        id="123456",
-        name="Minecraft",
-    )
-
-    game_list = GameList(data=[game])
-    return game_list
-    
-
 @app.get("/twitch-games/{game_name}")
 async def search_twitch_games(game_name:str):
     token = await get_twitch_token()
+
     
     async with httpx.AsyncClient() as client:
         response = await client.get(
@@ -74,6 +63,9 @@ async def search_twitch_games(game_name:str):
                 "Authorization": f"Bearer {token}"
             },
         )
+
+        print("*******************************************")
+        print(response)
         twitch_data = response.json()
         
         games = []
@@ -86,7 +78,7 @@ async def search_twitch_games(game_name:str):
         return GameList(data=games)
 
 @app.get("/twitch-videos/{game_id}")
-async def get_twitch_games(game_id:str):
+async def get_twitch_videos(game_id:str):
     token = await get_twitch_token()
     
     async with httpx.AsyncClient() as client:
