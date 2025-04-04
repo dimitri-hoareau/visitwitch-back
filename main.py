@@ -85,13 +85,14 @@ async def search_twitch_games(game_name:str):
         
         return GameList(data=games)
 
-@app.get("/twitch-videos")
-async def get_twitch_games():
+@app.get("/twitch-videos/{game_id}")
+async def get_twitch_games(game_id:str):
     token = await get_twitch_token()
     
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            "https://api.twitch.tv/helix/videos?game_id=21779",
+            "https://api.twitch.tv/helix/videos",
+            params={"game_id": game_id}, 
             headers={
                 "Client-ID": TWITCH_CLIENT_ID,
                 "Authorization": f"Bearer {token}"
