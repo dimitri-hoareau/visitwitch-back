@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from motor.motor_asyncio import AsyncIOMotorClient
 from contextlib import asynccontextmanager
 from app.models.game import Game, GameList
+from app.models.video import  Video, VideoList
 
 load_dotenv()
 
@@ -83,3 +84,31 @@ async def get_twitch_games():
             ))
         
         return GameList(data=games)
+
+@app.get("/twitch-videos")
+async def get_twitch_games():
+    token = await get_twitch_token()
+    
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "https://api.twitch.tv/helix/videos?game_id=21779",
+            headers={
+                "Client-ID": TWITCH_CLIENT_ID,
+                "Authorization": f"Bearer {token}"
+            },
+        )
+        
+        twitch_data = response.json()
+        
+        videos = []
+        for item in twitch_data["data"]:
+            videos.append(Video(
+                id=item["id"],
+                title=item["title"],
+                created_at=item["created_at"],
+                url=item["url"],
+                thumbnail_url=item["thumbnail_url"]
+            ))
+        
+        return VideoList(data=videos)
+    
