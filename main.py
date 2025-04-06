@@ -64,15 +64,14 @@ async def search_twitch_games(game_name:str):
             },
         )
 
-        print("*******************************************")
-        print(response)
         twitch_data = response.json()
         
         games = []
         for item in twitch_data["data"]:
             games.append(Game(
                 id=item["id"],
-                name=item["name"]
+                name=item["name"],
+                box_art_url=item.get("box_art_url")
             ))
         
         return GameList(data=games)
