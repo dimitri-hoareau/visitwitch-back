@@ -50,57 +50,96 @@ async def get_twitch_token():
     
 
 @app.get("/twitch-games/{game_name}")
-async def search_twitch_games(game_name:str):
+async def search_twitch_games(game_name: str, max_results: bool = False):
     token = await get_twitch_token()
-
+    
+    games = []
+    cursor = None
     
     async with httpx.AsyncClient() as client:
-        response = await client.get(
-            "https://api.twitch.tv/helix/search/categories",
-            params={"query": game_name},
-            headers={
-                "Client-ID": TWITCH_CLIENT_ID,
-                "Authorization": f"Bearer {token}"
-            },
-        )
-
-        twitch_data = response.json()
-        
-        games = []
-        for item in twitch_data["data"]:
-            games.append(Game(
-                id=item["id"],
-                name=item["name"],
-                box_art_url=item.get("box_art_url")
-            ))
-        
-        return GameList(data=games)
+        while True:
+            params = {
+                "query": game_name,
+                "first": 100  # Maximum autorisé par Twitch par requête
+            }
+            
+            if cursor:
+                params["after"] = cursor
+                
+            response = await client.get(
+                "https://api.twitch.tv/helix/search/categories",
+                params=params,
+                headers={
+                    "Client-ID": TWITCH_CLIENT_ID,
+                    "Authorization": f"Bearer {token}"
+                }
+            )
+            
+            twitch_data = response.json()
+            
+            for item in twitch_data["data"]:
+                games.append(Game(
+                    id=item["id"],
+                    name=item["name"],
+                    box_art_url=item.get("box_art_url")
+                ))
+            
+            if (max_results and 
+                "pagination" in twitch_data and 
+                "cursor" in twitch_data["pagination"] and 
+                len(twitch_data["data"]) > 0):
+                cursor = twitch_data["pagination"]["cursor"]
+            else:
+                break
+    
+    return GameList(data=games)
 
 @app.get("/twitch-videos/{game_id}")
-async def get_twitch_videos(game_id:str):
+async def get_twitch_videos(game_id: str, max_results: bool = False):
     token = await get_twitch_token()
     
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            "https://api.twitch.tv/helix/videos",
-            params={"game_id": game_id}, 
-            headers={
-                "Client-ID": TWITCH_CLIENT_ID,
-                "Authorization": f"Bearer {token}"
-            },
-        )
-        
-        twitch_data = response.json()
-        
-        videos = []
-        for item in twitch_data["data"]:
-            videos.append(Video(
-                id=item["id"],
-                title=item["title"],
-                created_at=item["created_at"],
-                url=item["url"],
-                thumbnail_url=item["thumbnail_url"]
-            ))
-        
-        return VideoList(data=videos)
+    videos = []
+    cursor = None
     
+    async with httpx.AsyncClient() as client:
+        while True:
+            params = {
+                "game_id": game_id,
+                "first": 100 
+            }
+            
+            if cursor:
+                params["after"] = cursor
+                
+            response = await client.get(
+                "https://api.twitch.tv/helix/videos",
+                params=params,
+                headers={
+                    "Client-ID": TWITCH_CLIENT_ID,
+                    "Authorization": f"Bearer {token}"
+                }
+            )
+            
+            twitch_data = response.json()
+        
+            for item in twitch_data["data"]:
+                thumbnail_url = item["thumbnail_url"]
+                thumbnail_url = thumbnail_url.replace("%{width}", "320").replace("%{height}", "180")
+                
+                videos.append(Video(
+                    id=item["id"],
+                    title=item["title"],
+                    created_at=item["created_at"],
+                    url=item["url"],
+                    thumbnail_url=thumbnail_url
+                ))
+            
+            if (max_results and 
+                "pagination" in twitch_data and 
+                "cursor" in twitch_data["pagination"] and 
+                len(twitch_data["data"]) > 0):
+                cursor = twitch_data["pagination"]["cursor"]
+            else:
+                break
+    
+    return VideoList(data=videos)
