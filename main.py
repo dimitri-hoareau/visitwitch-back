@@ -1,12 +1,15 @@
 import os
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from contextlib import asynccontextmanager
 from app.models.game import Game, GameList
 from app.models.video import  Video, VideoList
+from app.models.watched_videos import WatchedVideo
+from datetime import datetime, timezone
+
 
 load_dotenv()
 
@@ -60,7 +63,7 @@ async def search_twitch_games(game_name: str, max_results: bool = False):
         while True:
             params = {
                 "query": game_name,
-                "first": 100  # Maximum autorisé par Twitch par requête
+                "first": 100 
             }
             
             if cursor:
@@ -143,3 +146,24 @@ async def get_twitch_videos(game_id: str, max_results: bool = False):
                 break
     
     return VideoList(data=videos)
+
+
+@app.post("/watched-videos", status_code=201)
+async def add_watched_video(video: WatchedVideo):
+    try:
+        video_data = video.model_dump()
+        
+        video_data["watched_at"] = datetime.now(timezone.utc)
+        
+        await app.mongodb["watched_videos"].insert_one(video_data)
+        
+        return {
+            "status": "success",
+            "message": "The video is corretly downloaded",
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error: {str(e)}"
+        )
+    
